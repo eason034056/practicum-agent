@@ -411,39 +411,39 @@ def google_search_grounding(query: str, max_results: int = 5) -> Dict[str, Any]:
             # item: One search result (a dictionary)
             
             # Extract and enhance content from multiple sources
-            # Why multiple sources: Google snippet is short (~160 chars), need more info
+            # Why use multiple sources: the Google snippet is short (~160 chars), so we need more info
             
-            # Get basic snippet
+            # Get the basic snippet
             snippet = item.get("snippet", "")
-            # snippet: 基本的文本摘要（約160字符）
+            # snippet: Basic text summary (approximately 160 characters)
             
             # Get HTML snippet (may contain additional information)
             html_snippet = item.get("htmlSnippet", "")
-            # htmlSnippet: HTML格式的摘要，可能包含更多信息
+            # htmlSnippet: HTML-formatted summary, may contain extra information
             
             # Extract metadata from pagemap if available
-            # pagemap: 包含頁面的結構化數據（如metatags、contactinfo等）
+            # pagemap: Contains structured page data (like metatags, contactinfo, etc.)
             pagemap = item.get("pagemap", {})
             additional_info = []
-            # additional_info: 從pagemap提取的額外信息列表
+            # additional_info: List of extra information extracted from pagemap
             
             # Try to extract contact information from pagemap
             # Why pagemap: Sometimes contains structured data like phone, address
             if "metatags" in pagemap and pagemap["metatags"]:
                 metatags = pagemap["metatags"][0]  # First metatag set
-                # metatags: 頁面的meta標籤（可能包含描述、關鍵詞等）
+                # metatags: The page's meta tags (may include description, keywords, etc.)
                 
                 # Extract description meta tag (often more detailed than snippet)
                 if "og:description" in metatags:
                     additional_info.append(metatags["og:description"])
-                    # og:description: Open Graph描述，通常比snippet更詳細
+                    # og:description: Open Graph description, usually more detailed than snippet
                 elif "description" in metatags:
                     additional_info.append(metatags["description"])
-                    # description: 標準meta描述
+                    # description: Standard meta description
             
             # Try to get contact info from pagemap
             if "contactpoint" in pagemap:
-                # contactpoint: 結構化的聯繫信息
+                # contactpoint: Structured contact information
                 for contact in pagemap["contactpoint"]:
                     if "telephone" in contact:
                         additional_info.append(f"Phone: {contact['telephone']}")
@@ -451,9 +451,9 @@ def google_search_grounding(query: str, max_results: int = 5) -> Dict[str, Any]:
                         additional_info.append(f"Email: {contact['email']}")
             
             # Combine all available content
-            # Why combine: More content = better chance to find contact details
+            # Why combine: The more content, the better chance to find contact details
             content_parts = []
-            # content_parts: 儲存所有不重複的內容片段
+            # content_parts: Store all unique content fragments here
             
             # Add basic snippet first
             if snippet:
@@ -463,9 +463,9 @@ def google_search_grounding(query: str, max_results: int = 5) -> Dict[str, Any]:
                 # Remove HTML tags and entities from htmlSnippet
                 import re
                 clean_html = re.sub(r'<[^>]+>', '', html_snippet)
-                # 去除HTML標籤
+                # Remove HTML tags
                 clean_html = re.sub(r'&[a-z]+;', ' ', clean_html)
-                # 去除HTML實體（如 &nbsp;）
+                # Remove HTML entities (like &nbsp;)
                 clean_html = clean_html.strip()
                 
                 # Only add if significantly different from snippet
@@ -484,9 +484,9 @@ def google_search_grounding(query: str, max_results: int = 5) -> Dict[str, Any]:
             
             # Combine into single content string
             enhanced_content = " | ".join(filter(None, content_parts))
-            # filter(None, ...): 過濾掉空字符串和None值
-            # " | ".join(): 用分隔符連接所有不重複的內容
-            # Why " | ": 清晰的視覺分隔，便於LLM識別不同來源的信息
+            # filter(None, ...): Filters out empty strings and None values
+            # " | ".join(): Joins all unique pieces of content with a separator
+            # Why " | ": Easy visual separation so the LLM can tell the source of info
             
             # Extract relevant fields
             processed_results.append({
@@ -497,12 +497,9 @@ def google_search_grounding(query: str, max_results: int = 5) -> Dict[str, Any]:
                 "url": item.get("link", "N/A"),
                 
                 # "content": Enhanced content combining snippet, htmlSnippet, and pagemap data
-                # Why enhanced: Google snippet alone is too short (~160 chars)
+                # Why enhanced: The Google snippet alone is too short (~160 chars)
                 # This combines multiple sources for more complete information
                 "content": enhanced_content if enhanced_content else "N/A",
-                # content: 增強的內容，結合了snippet、htmlSnippet和pagemap數據
-                # 字面意思：盡可能多地從Google結果中提取有用信息
-                # 為什麼這樣做：原始snippet太短，需要更多信息來提取聯繫方式
                 
                 # "displayLink": The domain name (e.g., "example.com")
                 "displayLink": item.get("displayLink", "N/A"),
@@ -510,7 +507,6 @@ def google_search_grounding(query: str, max_results: int = 5) -> Dict[str, Any]:
                 # Note: Google doesn't provide relevance scores in the response
                 # Results are already ordered by relevance (best first)
             })
-        
         # Return successful response
         return {
             "status": "success",  # Indicates successful search
