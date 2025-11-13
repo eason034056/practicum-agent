@@ -1,0 +1,57 @@
+# Core LangChain and LangGraph
+# langchain: Main framework for building LLM applications with composable components
+langchain>=0.1.0
+
+# langgraph: Extends LangChain with graph-based orchestration for complex agent workflows
+# Enables cyclical flows, state management, and conditional routing
+langgraph>=0.0.20
+
+# langchain-openai: Official integration for OpenAI models (GPT-4, GPT-3.5)
+# Provides chat models, embeddings, and function calling capabilities
+langchain-openai>=0.0.5
+
+# langchain-community: Community-contributed integrations and tools
+# Includes additional utilities and third-party service integrations
+langchain-community>=0.0.10
+
+# Web Search for RAG (Retrieval-Augmented Generation)
+# tavily-python: Professional search API optimized for LLM applications
+# Provides clean, structured search results perfect for grounding AI responses
+tavily-python>=0.3.0
+
+# Google Cloud (optional, for Vertex AI deployment)
+# google-cloud-aiplatform: Deploy and manage AI agents on Google Cloud
+# Provides Vertex AI integration for production deployment
+google-cloud-aiplatform>=1.38.0
+
+# google-cloud-trace: Distributed tracing for monitoring agent execution
+# Tracks performance and debugging in production
+google-cloud-trace>=1.11.0
+
+# Utilities
+# python-dotenv: Load environment variables from .env file
+# Keeps sensitive API keys out of source code
+python-dotenv>=1.0.0
+
+# pydantic: Data validation and settings management using Python type hints
+# Ensures type safety and validates tool inputs/outputs
+pydantic>=2.0.0
+
+# pydantic-settings: Separate package for settings management in pydantic v2
+# Provides BaseSettings class for configuration management
+pydantic-settings>=2.0.0
+
+# requests: HTTP library for making API calls to external services
+# Used for custom web scraping or API integrations
+requests>=2.31.0
+
+# Monitoring and Evaluation
+# langsmith: LangChain's monitoring and debugging platform
+# Provides trajectory visualization, performance metrics, and evaluation
+langsmith>=0.0.77
+
+# Testing
+# pytest: Testing framework for Python
+# Ensures agent reliability through unit and integration tests
+pytest>=7.4.0
+
