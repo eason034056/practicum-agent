@@ -19,7 +19,7 @@ Why These Tools Are Critical:
 from typing import Dict, List, Any, Optional
 
 # Import web search functionality from our search tools
-from tools.search_tools import web_search, search_with_context
+from tools.search_tools import google_search_grounding, search_with_context
 
 
 # ==============================================================================
@@ -102,9 +102,9 @@ def identify_ahj(location: str) -> Dict[str, Any]:
     # - "AHJ authority having jurisdiction {location}"
     
     # Perform web search for AHJ information
-    # web_search: Our search tool from search_tools.py
+    # google_search_grounding: Our search tool from search_tools.py
     # max_results=5: Get multiple sources for cross-validation
-    search_result = web_search(
+    search_result = google_search_grounding(
         query=query,
         max_results=5  # More results = better chance of accurate info
     )
@@ -152,80 +152,137 @@ def identify_ahj(location: str) -> Dict[str, Any]:
     
     # Iterate through search results
     for result in results:
-        # result: One search result dictionary
-        
+        # result: A single search result dictionary
+
         # Extract content from this result
         content = result.get("content", "")
-        # Why get content: This is the text snippet from the webpage
-        
+        # Get the text snippet from the webpage
+
         # Only include non-empty content
         if content:
             all_content.append(content)
-            # Add to our content collection
-            
+            # Add content to our collection
+
             sources.append({
                 "title": result.get("title", ""),
                 "url": result.get("url", "")
             })
             # Track source for citation purposes
-    
-    # Attempt to extract AHJ name from the search results
-    # Why extract: So state can track AHJ identification status
-    # Method: Simple keyword matching for common patterns
-    
-    combined_content = " ".join(all_content).lower()
-    # combined_content: All search results combined into one lowercase string
-    # Why lowercase: Makes pattern matching case-insensitive
-    
+
+    # Try to extract AHJ name from the search results
+    # This allows state to track AHJ identification status
+    # Method: Multiple patterns with robust regex matching
+
+    import re
+    # re: Regular expression module for pattern matching
+
+    combined_content = " ".join(all_content)
+    # combined_content: All search results combined into one string
+    # Keep original case for better pattern matching
+
     ahj_name = None  # Will store the extracted AHJ name
     ahj_type = None  # Will store "city" or "county"
-    
-    # Try to extract AHJ name using common patterns
-    # Pattern 1: "City of [Name]"
-    if "city of" in combined_content:
-        # Found "city of" pattern
-        import re
-        # re: Regular expression module for pattern matching
-        
-        # Look for "City of [Name]" pattern
-        # Why regex: Can extract the actual city name
-        match = re.search(r'city of ([a-z\s]+)', combined_content)
-        # r'city of ([a-z\s]+)': Pattern that captures city name
-        # (): Capture group - extracts the city name
-        # [a-z\s]+: One or more letters or spaces
-        
-        if match:
-            # Found a match!
-            city_name = match.group(1).strip().title()
-            # match.group(1): The captured city name
-            # .strip(): Remove extra whitespace
-            # .title(): Capitalize Each Word
-            
-            ahj_name = f"City of {city_name}"
-            # Format as "City of [Name]"
+
+    # Strategy 1: Try to extract from location parameter first
+    # This often gives the most reliable result
+    location_clean = location.strip()
+    # Cleaned location string
+
+    # Pattern 1a: Check if location matches "City Name, State Abbreviation" (e.g., "Evanston, IL")
+    city_state_match = re.match(r'^([A-Za-z\s\.]+),\s*([A-Z]{2})', location_clean)
+    # ^: Start of string
+    # ([A-Za-z\s\.]+): Capture city name (letters, spaces, dots)
+    # ,\s*: Comma and possible space
+    # ([A-Z]{2}): Two uppercase letters for state abbreviation
+
+    if city_state_match:
+        # Found "City, State" format
+        city_name = city_state_match.group(1).strip().title()
+        # Extracted city name, capitalized
+        state_abbr = city_state_match.group(2).upper()
+        # State abbreviation (uppercase)
+
+        ahj_name = f"City of {city_name}"
+        # Format: "City of [City Name]"
+        ahj_type = "city"
+        # Type: city
+
+    # Pattern 1b: Look for "City of [Name]" in search results
+    if not ahj_name:
+        # Only continue if AHJ not found yet
+        # (?i): Case-insensitive flag
+        # city of: Literal match
+        # \s+: One or more spaces
+        # ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*): Capture city name
+        #   - [A-Z][a-z]+: Capitalized word
+        #   - (?:\s+[A-Z][a-z]+)*: Optional additional capitalized words (non-capturing)
+        matches = re.finditer(r'(?i)city\s+of\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', combined_content)
+        # finditer: Finds all matches (iterator)
+        # We want to find the most common match
+
+        # Collect all found city names
+        city_names = [m.group(1).strip().title() for m in matches]
+        # List of matched city names, formatted
+
+        if city_names:
+            # If city names found, use the most common one to avoid misidentification
+            from collections import Counter
+            # Counter: Counts frequency of elements
+            most_common_city = Counter(city_names).most_common(1)[0][0]
+            # Counter(city_names): Counts occurrences of each city name
+            # .most_common(1): Return top 1 most common
+            # [0][0]: Extract city name string
+
+            ahj_name = f"City of {most_common_city}"
             ahj_type = "city"
-            # Type is city
-    
-    # Pattern 2: "[Name] County" (if city not found)
-    if not ahj_name and "county" in combined_content:
-        # Didn't find city pattern, try county
-        import re
-        
-        # Look for "[Name] County" pattern
-        match = re.search(r'([a-z\s]+)\s+county', combined_content)
-        # r'([a-z\s]+)\s+county': Pattern that captures county name
-        # ([a-z\s]+): Capture the county name (before "county")
-        # \s+county: Whitespace + "county"
-        
-        if match:
-            county_name = match.group(1).strip().title()
-            # Extract and format county name
-            
-            ahj_name = f"{county_name} County"
-            # Format as "[Name] County"
+
+    # Pattern 2: Look for "[Name] County"
+    if not ahj_name:
+        # Only check for county if AHJ not found yet
+        # ([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*): Capture county name
+        # \s+[Cc]ounty: Space and "County" or "county"
+        matches = re.finditer(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+[Cc]ounty', combined_content)
+
+        county_names = [m.group(1).strip().title() for m in matches]
+        # Extract all county names
+
+        if county_names:
+            from collections import Counter
+            most_common_county = Counter(county_names).most_common(1)[0][0]
+            # Most common county name
+
+            ahj_name = f"{most_common_county} County"
             ahj_type = "county"
-            # Type is county
-    
+
+    # Pattern 3: Try simpler pattern - "[Name] city" or "[Name] town"
+    if not ahj_name:
+        # Match patterns like "Evanston city"
+        match = re.search(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:city|town)', combined_content, re.IGNORECASE)
+        # (?:city|town): Non-capturing group, matches city or town
+        # re.IGNORECASE: Case-insensitive
+
+        if match:
+            city_name = match.group(1).strip().title()
+            ahj_name = f"City of {city_name}"
+            ahj_type = "city"
+
+    # Fallback: If still no match, try to infer from location
+    if not ahj_name and location_clean:
+        # Extract the first part that looks like a place name from location
+        # E.g., "Evanston, IL" -> "Evanston"
+        parts = re.split(r'[,\s]+', location_clean)
+        # Split location by comma or whitespace
+
+        for part in parts:
+            # Check each part
+            if len(part) > 2 and part[0].isupper() and not part.isupper():
+                # If length > 2, starts with uppercase, and not all uppercase (skip state abbreviations)
+                # This is likely a city name
+                ahj_name = f"City of {part.title()}"
+                ahj_type = "city"
+                break
+                # Stop after finding the first valid match
+
     # Return structured response with all gathered information
     # The agent's LLM will analyze this to extract the actual AHJ name
     return {
@@ -344,9 +401,10 @@ def get_development_regulations(ahj_name: str) -> Dict[str, Any]:
         # query: One of our search queries
         
         # Perform the search
-        # max_results=3: Fewer results per query since we have multiple queries
-        # Total results: 3 queries × 3 results = 9 pieces of information
-        search_result = web_search(query=query, max_results=3)
+        # max_results=5: More results per query for better coverage
+        # Google snippets are short, need more sources
+        # Total results: 3 queries × 5 results = 15 pieces of information
+        search_result = google_search_grounding(query=query, max_results=5)
         
         # Check if search succeeded
         if search_result["status"] == "success":

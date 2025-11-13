@@ -31,7 +31,7 @@ from agent.nodes import agent_node, tool_executor_node, should_continue
 from agent.graph import create_utility_agent, run_agent
 # Graph construction
 
-from tools.search_tools import web_search
+from tools.search_tools import google_search_grounding
 # Example tool to test
 
 # Mock for testing without API calls
@@ -247,7 +247,7 @@ def test_web_search_success(mock_tavily):
     # When web_search calls _tavily_client.results(), it gets this
     
     # Act: Call the function
-    result = web_search("test query")
+    result = google_search_grounding("test query")
     
     # Assert: Verify result structure
     assert result["status"] == "success"
@@ -265,14 +265,14 @@ def test_web_search_success(mock_tavily):
 
 def test_web_search_empty_query():
     """
-    Test web_search with empty query.
+    Test google_search_grounding with empty query.
     
     What we're testing:
-    - web_search handles empty input gracefully
+    - google_search_grounding handles empty input gracefully
     - Returns error status with helpful message
     """
     # Act
-    result = web_search("")
+    result = google_search_grounding("")
     # Call with empty string
     
     # Assert

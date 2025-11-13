@@ -38,7 +38,7 @@ from tools.utility_tools import (
 
 # Web search and RAG tools
 from tools.search_tools import (
-    web_search,                # General web search
+    google_search_grounding,                # General web search
     search_with_context        # Web search with context from previous results
 )
 
@@ -62,7 +62,7 @@ __all__ = [
     "get_connection_requirements",
     
     # Search Tools
-    "web_search",
+    "google_search_grounding",
     "search_with_context",
 ]
 

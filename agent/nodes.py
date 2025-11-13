@@ -52,7 +52,7 @@ from tools import (
     search_stormwater_authority,
     get_utility_contact_info,
     get_connection_requirements,
-    web_search
+    google_search_grounding
 )
 # These are all the tools the agent can use
 
@@ -121,7 +121,7 @@ llm_with_tools = llm.bind_tools([
     # Function: Gets connection requirements for a provider
     
     # Search tools
-    web_search
+    google_search_grounding
     # Function: General web search
     # LLM will call this for any information not covered by specific tools
 ])
@@ -390,7 +390,7 @@ def _get_tool_description(tool_name: str) -> str:
         "search_stormwater_authority": "find the stormwater management authority",
         "get_utility_contact_info": "get contact information for a utility provider",
         "get_connection_requirements": "get utility connection requirements and procedures",
-        "web_search": "perform a general web search for information"
+        "google_search_grounding": "perform a general web search for information"
     }
     return descriptions.get(tool_name, "perform its designated function")
 
@@ -484,7 +484,7 @@ def tool_executor_node(state: AgentState) -> Dict[str, Any]:
         "get_connection_requirements": get_connection_requirements,
         
         # Search tools
-        "web_search": web_search
+        "google_search_grounding": google_search_grounding
     }
     # tool_map: Dictionary for tool lookup
     # Why dictionary: O(1) lookup by name

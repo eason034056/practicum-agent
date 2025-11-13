@@ -27,7 +27,7 @@ Key Insight: Most locations have ONE provider per utility type
 from typing import Dict, List, Any, Optional
 
 # Import search functionality
-from tools.search_tools import web_search, search_with_context
+from tools.search_tools import search_with_context, google_search_grounding
 
 
 # ==============================================================================
@@ -135,9 +135,10 @@ def search_gas_provider(location: str) -> Dict[str, Any]:
     # - f"natural gas service area {location}"
     
     # Perform web search
-    # max_results=5: Get multiple sources for validation
-    # Why 5: Balance between thoroughness and API cost/time
-    search_result = web_search(query=query, max_results=5)
+    # max_results=8: Get multiple sources for validation
+    # Why 8: Google snippets are short (~160 chars), need more sources to find contact details
+    # Balance between thoroughness and API cost/time
+    search_result = google_search_grounding(query=query, max_results=8)
     # search_result: Dict with status, query, results, or error
     
     # Check if search was successful
@@ -257,7 +258,8 @@ def search_electric_provider(location: str) -> Dict[str, Any]:
     # Why consistent pattern: Helps with code maintainability
     
     # Perform search
-    search_result = web_search(query=query, max_results=5)
+    # max_results=8: Google snippets are short, need more sources for contact details
+    search_result = google_search_grounding(query=query, max_results=8)
     
     # Error handling
     if search_result["status"] != "success":
@@ -351,7 +353,8 @@ def search_water_provider(location: str) -> Dict[str, Any]:
     # Why important: Disambiguates from sewer/wastewater searches
     
     # Perform search
-    search_result = web_search(query=query, max_results=5)
+    # max_results=8: Google snippets are short, need more sources for contact details
+    search_result = google_search_grounding(query=query, max_results=8)
     
     # Error handling
     if search_result["status"] != "success":
@@ -441,7 +444,8 @@ def search_sewer_provider(location: str) -> Dict[str, Any]:
     # Why both terms: Different authorities use different terminology
     
     # Perform search
-    search_result = web_search(query=query, max_results=5)
+    # max_results=8: Google snippets are short, need more sources for contact details
+    search_result = google_search_grounding(query=query, max_results=8)
     
     # Error handling
     if search_result["status"] != "success":
@@ -541,7 +545,8 @@ def search_stormwater_authority(location: str) -> Dict[str, Any]:
     # Why different pattern: Stormwater is regulatory, not service-oriented
     
     # Perform search
-    search_result = web_search(query=query, max_results=5)
+    # max_results=8: Google snippets are short, need more sources for contact details
+    search_result = google_search_grounding(query=query, max_results=8)
     
     # Error handling
     if search_result["status"] != "success":
@@ -659,7 +664,8 @@ def get_utility_contact_info(
     # - "contact phone number address": Specific information we want
     
     # Perform search
-    search_result = web_search(query=query, max_results=5)
+    # max_results=8: Google snippets are short, need more sources for contact details
+    search_result = google_search_grounding(query=query, max_results=8)
     
     # Error handling
     if search_result["status"] != "success":
@@ -770,7 +776,8 @@ def get_connection_requirements(provider_name: str) -> Dict[str, Any]:
     # - "process": Looking for step-by-step procedures
     
     # Perform search
-    search_result = web_search(query=query, max_results=5)
+    # max_results=8: Google snippets are short, need more sources for contact details
+    search_result = google_search_grounding(query=query, max_results=8)
     
     # Error handling
     if search_result["status"] != "success":
@@ -843,12 +850,12 @@ def get_connection_requirements(provider_name: str) -> Dict[str, Any]:
 #
 # 5. Defensive Programming
 #    - Input validation
-#    - Error handling (try/except in web_search)
+#    - Error handling (try/except in google_search_grounding)
 #    - Graceful failures with clear error messages
 #    - Why: Production reliability
 #
 # 6. DRY Principle (Don't Repeat Yourself)
-#    - Common logic in web_search()
+#    - Common logic in google_search_grounding()
 #    - Similar pattern across all provider functions
 #    - Why: Easier maintenance, consistent behavior
 #

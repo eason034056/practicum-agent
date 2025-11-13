@@ -101,6 +101,22 @@ class Settings(BaseSettings):
     # Returns clean, structured results ideal for RAG
     # Alternative: Google Search API, Bing Search API
     
+    google_search_api_key: str = Field(
+        default="",
+        description="Google Custom Search API key"
+    )
+    # Why Google Search: Industry-leading search quality and coverage
+    # Provides official Google search results with rich metadata
+    # Used for Google Search Grounding feature
+    
+    google_search_engine_id: str = Field(
+        default="",
+        description="Google Custom Search Engine ID (CX)"
+    )
+    # Why needed: Identifies which custom search engine to use
+    # Required for Google Custom Search API authentication
+    # Get from: https://programmablesearchengine.google.com/
+    
     # --------------------------------------------------------------------------
     # LangSmith Configuration (Monitoring)
     # --------------------------------------------------------------------------

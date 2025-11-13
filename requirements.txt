@@ -28,6 +28,11 @@ google-cloud-aiplatform>=1.38.0
 # Tracks performance and debugging in production
 google-cloud-trace>=1.11.0
 
+# google-cloud-discoveryengine: Google Cloud Discovery Engine for Search with Grounding
+# Provides search functionality that grounds responses in real search results
+# Enables combining generative AI with Google Search quality
+google-cloud-discoveryengine>=0.11.0
+
 # Utilities
 # python-dotenv: Load environment variables from .env file
 # Keeps sensitive API keys out of source code
