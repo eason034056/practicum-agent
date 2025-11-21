@@ -31,11 +31,17 @@ from typing import Dict, List, Any, Optional
 # - Provides answer summaries
 from langchain_community.utilities.tavily_search import TavilySearchAPIWrapper
 
-# Google Search API for Search Grounding
+# Google Search API for Search Grounding (Legacy)
 # Why import requests: To make HTTP calls to Google Custom Search API
 # Why import json: To parse JSON responses from Google API
 import requests
 import json
+
+# Google Generative AI (Gemini) for Grounding with Google Search
+# Why import genai: New official SDK for Gemini with native Google Search grounding
+# Why import types: Type definitions for Gemini API requests/responses
+from google import genai
+from google.genai import types
 
 # concurrent.futures: For parallel execution of multiple search APIs
 # ThreadPoolExecutor: Runs multiple functions simultaneously in separate threads
@@ -62,7 +68,7 @@ if settings.tavily_api_key:
 
 
 # ==============================================================================
-# Initialize Google Search Configuration
+# Initialize Google Search Configuration (Legacy)
 # ==============================================================================
 # _google_search_available: Boolean flag to check if Google Search is configured
 # Why check both: Need both API key AND search engine ID for Google Search to work
@@ -77,6 +83,20 @@ _google_search_available = bool(settings.google_search_api_key and settings.goog
 _GOOGLE_SEARCH_URL = "https://www.googleapis.com/customsearch/v1"
 # Why v1: Current stable version of the API
 # Why customsearch: Google's programmable search service
+
+# ==============================================================================
+# Initialize Gemini Client for Grounding with Google Search
+# ==============================================================================
+# _gemini_client: Client for Gemini API with native Google Search grounding
+# Why initialize here: Reuse same client across all function calls
+# Why conditional: Only create if API key is available
+_gemini_client = None
+if settings.gemini_api_key:
+    # genai.Client(): Creates a Gemini API client
+    # api_key: Authentication for Gemini API
+    _gemini_client = genai.Client(api_key=settings.gemini_api_key)
+    # If API key is not set, _gemini_client stays None
+    # Functions will handle this gracefully
 
 
 # ==============================================================================
@@ -247,308 +267,334 @@ def web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
 
 
 # ==============================================================================
-# Tool 1b: Google Search with Grounding
+# Tool 1b: Grounding with Google Search (Gemini)
 # ==============================================================================
 def google_search_grounding(query: str, max_results: int = 5) -> Dict[str, Any]:
     """
-    Perform a Google search with grounding capability.
+    Perform search using Gemini's Grounding with Google Search capability.
     
-    This function uses Google's Custom Search API to retrieve high-quality
-    search results directly from Google. These results can be used for
-    "grounding" - anchoring AI-generated responses in real search data.
+    This function uses Google's Gemini API with native Google Search grounding.
+    Unlike traditional search APIs, Gemini:
+    1. Analyzes the query and determines if search is needed
+    2. Automatically generates and executes search queries
+    3. Processes and synthesizes search results
+    4. Returns a grounded response with automatic citations
     
     Function Name Explanation:
     - "google_search_grounding": Clearly indicates this uses Google Search
-    - "grounding": Refers to the practice of anchoring AI responses in real data
-    - Why separate from web_search: Different provider, different capabilities
+    - "grounding": Refers to Gemini's native feature that anchors responses in real-time web data
+    - Why this name: Matches Gemini's official "Grounding with Google Search" feature
     
-    What is "Grounding"?
-    - Grounding means connecting AI responses to verifiable sources
-    - Instead of hallucinating, the AI references actual search results
-    - Increases accuracy and credibility of responses
-    - Users can verify information by checking sources
+    What is "Grounding with Google Search"?
+    - Native Gemini feature that connects the model to real-time web content
+    - Model automatically decides when to search and what queries to use
+    - Responses are synthesized from search results with automatic citations
+    - Reduces hallucinations by basing responses on verifiable sources
+    - Works with all available languages and Gemini models
     
-    Why Google Search:
-    - Industry-leading search quality
-    - Most comprehensive index of web content
-    - Rich metadata (snippets, titles, URLs)
-    - Trusted brand for information retrieval
+    Why Gemini Grounding vs Traditional Search:
+    - Automatic: Model decides when search is needed
+    - Intelligent: Generates optimal search queries automatically
+    - Synthesized: Returns coherent answers, not just raw results
+    - Citations: Provides structured citation data with inline references
+    - Real-time: Accesses current web content beyond training cutoff
     
     Args:
-        query (str): The search query (e.g., "Johnson City TN gas utility provider")
-        max_results (int): Maximum number of results to return (default: 5)
-            - Google Custom Search allows up to 10 results per request
-            - More results = more API cost
+        query (str): The search query/question (e.g., "Who won euro 2024?")
+            - Can be a natural language question
+            - Model will determine if search is needed and generate appropriate queries
+        max_results (int): Maximum number of results to process (default: 5)
+            - Controls how many search results Gemini processes
+            - More results = more comprehensive but slower
     
     Returns:
         Dict[str, Any]: A dictionary containing:
             - status: "success" or "error"
-            - source: "google" (to identify the search provider)
-            - results: List of search results (if success)
-            - error: Error message (if error)
+            - source: "gemini_grounding" (to identify this as Gemini grounding)
             - query: The original query (for traceability)
+            - answer: Synthesized answer from Gemini (if success)
+            - results: List of web sources used (if success)
+            - citations: Citation mapping for inline references (if success)
+            - web_search_queries: List of search queries used by Gemini (if available)
+            - error: Error message (if error)
         
-        Why include "source" field:
-        - When combining multiple search providers, we need to know which is which
-        - Allows comparison of results from different sources
-        - Helps with attribution and citing sources
+        Why this structure:
+        - answer: The main AI-synthesized response
+        - results: Source URLs and titles for verification
+        - citations: Maps text segments to their sources
+        - web_search_queries: Shows what the model searched for (debugging)
     
     Example Return Value:
         {
             "status": "success",
-            "source": "google",
-            "query": "Johnson City TN gas utility provider",
+            "source": "gemini_grounding",
+            "query": "Who won euro 2024?",
+            "answer": "Spain won Euro 2024, defeating England 2-1 in the final.[1], [2]",
             "results": [
                 {
-                    "title": "Nicor Gas - Service Area",
-                    "url": "https://nicorgas.com/service-area",
-                    "snippet": "Nicor Gas serves Johnson City...",
-                    "displayLink": "nicorgas.com"
-                },
-                ...
+                    "title": "UEFA Euro 2024 Final",
+                    "url": "https://example.com/euro2024",
+                    "index": 0
+                }
             ],
-            "count": 5
+            "citations": [
+                {
+                    "text": "Spain won Euro 2024, defeating England 2-1 in the final.",
+                    "sources": [0, 1]
+                }
+            ],
+            "web_search_queries": ["UEFA Euro 2024 winner"],
+            "count": 2
         }
     """
     
     # Validate input: Ensure query is not empty
-    # Why validate: Same as web_search - prevent wasted API calls
+    # Why validate: Prevent wasted API calls
     if not query or not query.strip():
         # not query: Checks if query is None, empty string, or False
         # not query.strip(): Checks if query is only whitespace
         return {
             "status": "error",
-            "source": "google",  # Still identify source even on error
+            "source": "gemini_grounding",  # Identify source even on error
             "error": "Search query cannot be empty",
             "query": query,
             "results": []
         }
     
-    # Check if Google Search is configured
-    # Why check: Need both API key and search engine ID
-    if not _google_search_available:
-        # _google_search_available: Boolean flag set at module initialization
-        # False means either API key or search engine ID is missing
+    # Check if Gemini client is configured
+    # Why check: Need Gemini API key to use this feature
+    if not _gemini_client:
+        # _gemini_client: Global client initialized at module load
+        # None means GEMINI_API_KEY was not set
         return {
             "status": "error",
-            "source": "google",
-            "error": "Google Search API not configured. Please set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID.",
+            "source": "gemini_grounding",
+            "error": "Gemini API not configured. Please set GEMINI_API_KEY in your .env file.",
             "query": query,
             "results": []
         }
         # Why descriptive error: Helps user know exactly what's missing
     
-    # Perform the search
+    # Perform grounded search with Gemini
     try:
-        # try block: Catches network errors, API errors, invalid responses
+        # try block: Catches API errors, network issues, invalid responses
         # Why needed: External API calls can fail in many ways
         
-        # Build request parameters
-        # params: Dictionary of query parameters for the API request
-        # These will be URL-encoded and appended to the request URL
-        params = {
-            # q: The search query
-            # Why "q": Standard query parameter name (short for "query")
-            "q": query,
-            
-            # key: Your Google API key for authentication
-            # Why needed: Google requires authentication for all API calls
-            "key": settings.google_search_api_key,
-            
-            # cx: Custom Search Engine ID
-            # Why needed: Identifies which search engine configuration to use
-            # cx stands for "Custom Search Engine ID"
-            "cx": settings.google_search_engine_id,
-            
-            # num: Number of results to return
-            # Why min(): Google allows max 10 results per request
-            # If user requests more, we cap at 10
-            "num": min(max_results, 10),
-            # min(max_results, 10): Takes smaller of the two values
-            # Example: min(5, 10) = 5, min(15, 10) = 10
-        }
-        
-        # Make the API request
-        # requests.get(): Sends HTTP GET request to the URL
-        # Why GET: Read-only operation (retrieving data, not modifying)
-        # _GOOGLE_SEARCH_URL: The base URL for Google Custom Search API
-        # params=params: Appends query parameters to URL
-        # timeout=10: Wait maximum 10 seconds for response
-        response = requests.get(
-            _GOOGLE_SEARCH_URL,
-            params=params,
-            timeout=10  # Why timeout: Prevents hanging if API is slow
+        # Create the Google Search grounding tool
+        # types.Tool: Defines a tool that Gemini can use
+        # google_search: Native Google Search integration
+        # types.GoogleSearch(): Configuration for search grounding
+        grounding_tool = types.Tool(
+            google_search=types.GoogleSearch()
         )
-        # response: HTTP response object with status code, headers, body
+        # Why this structure: Official Gemini API format for grounding
+        # The model will automatically use this tool when it determines search is needed
         
-        # Check if request was successful
-        # raise_for_status(): Raises exception if status code indicates error
-        # Why call this: Converts HTTP errors (404, 500, etc.) to Python exceptions
-        # Status codes: 200-299 = success, 400-499 = client error, 500-599 = server error
-        response.raise_for_status()
+        # Configure the generation with the grounding tool
+        # types.GenerateContentConfig: Configuration for content generation
+        # tools=[grounding_tool]: List of tools available to the model
+        config = types.GenerateContentConfig(
+            tools=[grounding_tool]
+        )
+        # Why pass as config: Tools need to be registered before generation
         
-        # Parse JSON response
-        # response.json(): Parses the response body as JSON
-        # Why: Google API returns data in JSON format
-        # Returns: Python dict with search results
-        data = response.json()
-        # data: Dictionary containing search results and metadata
+        # Build a detailed prompt to get comprehensive answers
+        # Why detailed prompt: Ensures Gemini provides thorough, actionable information
+        # Instead of just passing the query, we give clear instructions for what we need
+        detailed_prompt = f"""Search the web and provide comprehensive, detailed information about: {query}
+
+Please include:
+- Complete contact information (phone numbers, email addresses, websites)
+- Specific addresses and service areas
+- Step-by-step connection/application requirements
+- Required documents and fees
+- Technical specifications if applicable
+- Any important policies or regulations
+- Links to relevant forms or applications
+
+Provide a thorough, well-structured answer with all details that would be useful for someone taking action."""
         
-        # Extract search results from response
-        # data.get("items", []): Gets the "items" key from response
-        # Why "items": Google API puts search results in an "items" array
-        # Why default []: If no results found, "items" key might be missing
-        items = data.get("items", [])
-        # items: List of search result dictionaries
+        # Generate content with grounding
+        # _gemini_client.models.generate_content(): Main generation method
+        # model: Which Gemini model to use
+        # contents: The user's query/prompt with detailed instructions
+        # config: Configuration including tools
+        response = _gemini_client.models.generate_content(
+            model="gemini-2.0-flash-exp",  # Fast model with grounding support
+            # Why gemini-2.0-flash-exp: Fast, supports grounding, good quality
+            # Alternative: gemini-2.5-flash, gemini-1.5-pro
+            contents=detailed_prompt,  # Detailed prompt for comprehensive answer
+            config=config,  # Configuration with grounding tool
+        )
+        # response: Contains generated text and grounding metadata
         
-        # Process and structure the results
-        # Why process: Extract only the fields we need, ignore extra metadata
+        # Extract the main text answer
+        # response.text: The AI-generated answer
+        # Why .text: Convenience property that extracts text from response
+        answer_text = response.text
+        # answer_text: Main synthesized answer from Gemini
+        
+        # Extract grounding metadata if available
+        # grounding_metadata: Contains search queries, sources, and citations
+        # Why check: Response might not have grounding metadata if search wasn't used
+        grounding_metadata = None
+        if response.candidates and len(response.candidates) > 0:
+            # response.candidates: List of generated responses (usually just one)
+            # Why check: Ensure at least one candidate exists
+            candidate = response.candidates[0]
+            # candidate: The first (and usually only) response candidate
+            
+            # Get grounding metadata from the candidate
+            # grounding_metadata: Contains web search queries, sources, citations
+            grounding_metadata = candidate.grounding_metadata
+            # Why important: Contains all the citation and source information
+        
+        # Process grounding metadata to extract results and citations
+        # Why process: Convert Gemini's structure to our standard format
         processed_results = []
-        # processed_results: Empty list to store cleaned results
+        web_search_queries = []
+        citations = []
         
-        # Iterate through each search result
-        for item in items:
-            # item: One search result (a dictionary)
+        if grounding_metadata:
+            # grounding_metadata exists: Model used search grounding
             
-            # Extract and enhance content from multiple sources
-            # Why use multiple sources: the Google snippet is short (~160 chars), so we need more info
+            # Extract web search queries used by the model
+            # web_search_queries: List of queries Gemini generated and executed
+            # Why useful: Debugging, understanding model reasoning
+            if hasattr(grounding_metadata, 'web_search_queries'):
+                web_search_queries = grounding_metadata.web_search_queries or []
+                # hasattr: Check if attribute exists
+                # or []: Default to empty list if None
             
-            # Get the basic snippet
-            snippet = item.get("snippet", "")
-            # snippet: Basic text summary (approximately 160 characters)
-            
-            # Get HTML snippet (may contain additional information)
-            html_snippet = item.get("htmlSnippet", "")
-            # htmlSnippet: HTML-formatted summary, may contain extra information
-            
-            # Extract metadata from pagemap if available
-            # pagemap: Contains structured page data (like metatags, contactinfo, etc.)
-            pagemap = item.get("pagemap", {})
-            additional_info = []
-            # additional_info: List of extra information extracted from pagemap
-            
-            # Try to extract contact information from pagemap
-            # Why pagemap: Sometimes contains structured data like phone, address
-            if "metatags" in pagemap and pagemap["metatags"]:
-                metatags = pagemap["metatags"][0]  # First metatag set
-                # metatags: The page's meta tags (may include description, keywords, etc.)
+            # Extract grounding chunks (source URLs)
+            # grounding_chunks: List of web sources used
+            # Each chunk contains: uri (URL), title
+            if hasattr(grounding_metadata, 'grounding_chunks'):
+                chunks = grounding_metadata.grounding_chunks or []
+                # chunks: List of source web pages
                 
-                # Extract description meta tag (often more detailed than snippet)
-                if "og:description" in metatags:
-                    additional_info.append(metatags["og:description"])
-                    # og:description: Open Graph description, usually more detailed than snippet
-                elif "description" in metatags:
-                    additional_info.append(metatags["description"])
-                    # description: Standard meta description
+                for i, chunk in enumerate(chunks):
+                    # i: Index of the chunk (used for citation references)
+                    # chunk: One source web page
+                    
+                    if hasattr(chunk, 'web'):
+                        # chunk.web: Contains web-specific information
+                        web_info = chunk.web
+                        # web_info: Object with uri and title
+                        
+                        title = getattr(web_info, 'title', 'N/A')
+                        url = getattr(web_info, 'uri', 'N/A')
+                        
+                        # Extract domain from URL for displayLink compatibility
+                        # Why: Old code expects displayLink field
+                        displayLink = 'N/A'
+                        if url and url != 'N/A':
+                            try:
+                                from urllib.parse import urlparse
+                                parsed = urlparse(url)
+                                displayLink = parsed.netloc
+                                # netloc: Domain name (e.g., "example.com")
+                            except:
+                                displayLink = 'N/A'
+                        
+                        processed_results.append({
+                            "title": title,
+                            # getattr: Safe way to get attribute with default
+                            # title: The webpage title
+                            
+                            "url": url,
+                            # uri: The webpage URL
+                            
+                            "displayLink": displayLink,
+                            # displayLink: Domain name for compatibility with old code
+                            
+                            "index": i,
+                            # index: Position in chunks list (used for citations)
+                            
+                            "content": answer_text if i == 0 else f"Source: {title}",
+                            # content: For backward compatibility, include synthesized answer
+                            # Why: Old code expects content field with actual information
+                            # First result gets the full answer, others get title
+                            # This ensures tools that iterate results still get useful info
+                        })
             
-            # Try to get contact info from pagemap
-            if "contactpoint" in pagemap:
-                # contactpoint: Structured contact information
-                for contact in pagemap["contactpoint"]:
-                    if "telephone" in contact:
-                        additional_info.append(f"Phone: {contact['telephone']}")
-                    if "email" in contact:
-                        additional_info.append(f"Email: {contact['email']}")
-            
-            # Combine all available content
-            # Why combine: The more content, the better chance to find contact details
-            content_parts = []
-            # content_parts: Store all unique content fragments here
-            
-            # Add basic snippet first
-            if snippet:
-                content_parts.append(snippet)
-            
-            if html_snippet and html_snippet != snippet:
-                # Remove HTML tags and entities from htmlSnippet
-                import re
-                clean_html = re.sub(r'<[^>]+>', '', html_snippet)
-                # Remove HTML tags
-                clean_html = re.sub(r'&[a-z]+;', ' ', clean_html)
-                # Remove HTML entities (like &nbsp;)
-                clean_html = clean_html.strip()
+            # Extract grounding supports (citations)
+            # grounding_supports: Maps text segments to their sources
+            # Each support contains: segment (text), grounding_chunk_indices (source references)
+            if hasattr(grounding_metadata, 'grounding_supports'):
+                supports = grounding_metadata.grounding_supports or []
+                # supports: List of citation mappings
                 
-                # Only add if significantly different from snippet
-                # Why check: Avoid duplicate content
-                if clean_html and len(clean_html) > 50:
-                    # Check if not substring of snippet and vice versa
-                    if clean_html not in snippet and snippet not in clean_html:
-                        content_parts.append(clean_html)
-                    elif len(clean_html) > len(snippet):
-                        # If clean_html contains snippet but has more info, replace
-                        content_parts = [clean_html]
-            
-            # Add additional info from pagemap (usually unique structured data)
-            if additional_info:
-                content_parts.extend(additional_info)
-            
-            # Combine into single content string
-            enhanced_content = " | ".join(filter(None, content_parts))
-            # filter(None, ...): Filters out empty strings and None values
-            # " | ".join(): Joins all unique pieces of content with a separator
-            # Why " | ": Easy visual separation so the LLM can tell the source of info
-            
-            # Extract relevant fields
+                for support in supports:
+                    # support: One citation mapping
+                    
+                    if hasattr(support, 'segment'):
+                        # segment: The text segment being cited
+                        segment = support.segment
+                        # segment: Object with text, start_index, end_index
+                        
+                        # Extract citation information
+                        citation_info = {
+                            "text": getattr(segment, 'text', ''),
+                            # text: The actual text being cited
+                            
+                            "start_index": getattr(segment, 'start_index', 0),
+                            # start_index: Character position where citation starts
+                            
+                            "end_index": getattr(segment, 'end_index', 0),
+                            # end_index: Character position where citation ends
+                            
+                            "sources": []
+                            # sources: List of source indices that support this text
+                        }
+                        
+                        # Extract source references
+                        if hasattr(support, 'grounding_chunk_indices'):
+                            citation_info["sources"] = support.grounding_chunk_indices or []
+                            # grounding_chunk_indices: List of indices into grounding_chunks
+                            # Example: [0, 1] means this text is supported by sources 0 and 1
+                        
+                        citations.append(citation_info)
+                        # Add this citation to our list
+        
+        # Handle case where no grounding was used (answered from model knowledge)
+        # Why: Sometimes Gemini answers from its own knowledge without searching
+        # In this case, we still need to provide a results list for backward compatibility
+        if not processed_results and answer_text:
+            # No web sources but we have an answer
+            # Create a synthetic result entry for backward compatibility
             processed_results.append({
-                # "title": The title of the webpage
-                "title": item.get("title", "N/A"),
-                
-                # "url": The full URL of the webpage
-                "url": item.get("link", "N/A"),
-                
-                # "content": Enhanced content combining snippet, htmlSnippet, and pagemap data
-                # Why enhanced: The Google snippet alone is too short (~160 chars)
-                # This combines multiple sources for more complete information
-                "content": enhanced_content if enhanced_content else "N/A",
-                
-                # "displayLink": The domain name (e.g., "example.com")
-                "displayLink": item.get("displayLink", "N/A"),
-                
-                # Note: Google doesn't provide relevance scores in the response
-                # Results are already ordered by relevance (best first)
+                "title": "Gemini Knowledge Base",
+                "url": "https://gemini.google.com",
+                "displayLink": "gemini.google.com",
+                "content": answer_text,
+                "index": 0
             })
+            # Why: Tools that iterate results expect at least one result
+            # This ensures they get the answer even if no web search was performed
+        
         # Return successful response
         return {
-            "status": "success",  # Indicates successful search
-            "source": "google",  # Identifies this as Google results
-            "query": query,  # Echo back query for context
-            "results": processed_results,  # List of search results
-            "count": len(processed_results)  # How many results returned
-            # Why include count: Agent can check if it got enough information
+            "status": "success",  # Indicates successful grounding
+            "source": "gemini_grounding",  # Identifies this as Gemini grounding
+            "query": query,  # Echo back original query
+            "answer": answer_text,  # The synthesized AI answer
+            "results": processed_results,  # List of source web pages
+            "citations": citations,  # Citation mapping for inline references
+            "web_search_queries": web_search_queries,  # Queries used by model
+            "count": len(processed_results),  # Number of sources
+            "has_grounding": grounding_metadata is not None
+            # has_grounding: Boolean indicating if search was actually used
+            # Why useful: Sometimes model answers from knowledge without searching
         }
     
-    except requests.exceptions.Timeout:
-        # Timeout: Request took longer than specified timeout
-        # Why catch separately: Provides specific error message
+    except AttributeError as e:
+        # AttributeError: Accessing attribute that doesn't exist
+        # Why catch: API response structure might change
         return {
             "status": "error",
-            "source": "google",
-            "error": "Search request timed out after 10 seconds",
-            "query": query,
-            "results": []
-        }
-    
-    except requests.exceptions.RequestException as e:
-        # RequestException: Base class for all requests library exceptions
-        # Catches: Connection errors, DNS failures, SSL errors, etc.
-        # as e: Stores the exception object in variable 'e'
-        return {
-            "status": "error",
-            "source": "google",
-            "error": f"Search request failed: {str(e)}",
-            # f"...": f-string for string interpolation
-            # str(e): Converts exception to readable message
-            "query": query,
-            "results": []
-        }
-    
-    except json.JSONDecodeError as e:
-        # JSONDecodeError: Response body is not valid JSON
-        # Why catch: API might return HTML error page instead of JSON
-        return {
-            "status": "error",
-            "source": "google",
-            "error": f"Invalid JSON response from Google API: {str(e)}",
+            "source": "gemini_grounding",
+            "error": f"Error parsing Gemini response structure: {str(e)}",
             "query": query,
             "results": []
         }
@@ -558,12 +604,141 @@ def google_search_grounding(query: str, max_results: int = 5) -> Dict[str, Any]:
         # Why needed: Catch-all for unknown error types
         return {
             "status": "error",
-            "source": "google",
-            "error": f"Unexpected error during Google search: {str(e)}",
+            "source": "gemini_grounding",
+            "error": f"Gemini grounding failed: {str(e)}",
+            # str(e): Converts exception to readable message
             "query": query,
             "results": []
         }
         # Why include error details: Helps debug issues in production
+
+
+# ==============================================================================
+# Helper Function: Add Citations to Text
+# ==============================================================================
+def add_citations_to_text(answer: str, citations: List[Dict], sources: List[Dict]) -> str:
+    """
+    Add inline citations to text based on grounding metadata.
+    
+    This helper function takes the answer text, citation information, and source list
+    to create a text with inline citations like [1](url), [2](url).
+    
+    Function Name Explanation:
+    - "add_citations_to_text": Clearly describes the function's purpose
+    - "citations": Refers to the citation metadata from Gemini
+    - "text": The output is formatted text with inline citations
+    
+    How Citations Work:
+    - Gemini provides citation data that maps text segments to sources
+    - Each text segment has start/end indices and source references
+    - We insert citation links at the end of each segment
+    - Citations are formatted as clickable markdown links: [1](url)
+    
+    Args:
+        answer (str): The AI-generated answer text
+        citations (List[Dict]): List of citation objects with:
+            - text: The cited text segment
+            - start_index: Start position in answer
+            - end_index: End position in answer
+            - sources: List of source indices
+        sources (List[Dict]): List of source objects with:
+            - url: Source URL
+            - title: Source title
+            - index: Source index
+    
+    Returns:
+        str: Text with inline citations added
+        
+        Example:
+        Input: "Spain won Euro 2024."
+        Output: "Spain won Euro 2024.[1](https://...)"
+    
+    How it Works:
+    1. Sort citations by end_index (descending) to avoid index shifting
+    2. For each citation, create citation links for its sources
+    3. Insert citation links at the end_index position
+    4. Result: Text with inline citations
+    """
+    
+    # If no citations, return original text
+    # Why check: Some responses might not have citations
+    if not citations:
+        return answer
+    
+    # Create a working copy of the text
+    # Why copy: We'll be modifying it by inserting citations
+    text = answer
+    
+    # Sort citations by end_index in descending order
+    # Why descending: Prevents index shifting when inserting
+    # Example: If we insert at position 100 first, position 50 stays unchanged
+    # But if we insert at 50 first, position 100 shifts to 110
+    sorted_citations = sorted(
+        citations,
+        key=lambda c: c.get("end_index", 0),
+        reverse=True  # Descending order
+    )
+    # lambda c: Function that extracts end_index from citation dict
+    # key=: Tells sorted() what to sort by
+    
+    # Process each citation
+    for citation in sorted_citations:
+        # citation: One citation mapping
+        
+        end_index = citation.get("end_index", 0)
+        # end_index: Where to insert the citation
+        
+        source_indices = citation.get("sources", [])
+        # source_indices: List of source indices for this citation
+        # Example: [0, 1] means cite sources 0 and 1
+        
+        if not source_indices:
+            # No sources for this citation, skip it
+            continue
+        
+        # Create citation links
+        # Format: [1](url), [2](url)
+        citation_links = []
+        for idx in source_indices:
+            # idx: Index into sources list
+            
+            if idx < len(sources):
+                # Make sure index is valid
+                # Why check: Prevent index out of range errors
+                
+                source = sources[idx]
+                # source: The source dictionary
+                
+                url = source.get("url", "")
+                # url: The source URL
+                
+                if url and url != "N/A":
+                    # Only add if URL is valid
+                    # Why check: Some sources might not have URLs
+                    
+                    # Create markdown link: [index](url)
+                    # +1: Convert from 0-indexed to 1-indexed for display
+                    # Example: [1](https://example.com)
+                    citation_links.append(f"[{idx + 1}]({url})")
+        
+        if citation_links:
+            # We have at least one citation link
+            
+            # Join multiple citations with comma separator
+            # Example: "[1](url1), [2](url2)"
+            citation_string = ", ".join(citation_links)
+            # join(): Combines list items into single string
+            
+            # Insert citation at end_index
+            # text[:end_index]: Everything before the insertion point
+            # citation_string: The citations to insert
+            # text[end_index:]: Everything after the insertion point
+            text = text[:end_index] + citation_string + text[end_index:]
+            # Why this works: String slicing and concatenation
+    
+    # Return text with citations added
+    return text
+    # text: Original answer with inline citation links
 
 
 # ==============================================================================

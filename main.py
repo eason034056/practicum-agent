@@ -555,9 +555,15 @@ def run_interactive_mode() -> None:
             )
             # initial_state: Dict with user query
             
-            # Run agent
-            result = agent.invoke(initial_state)
+            # Run agent with increased recursion limit
+            # recursion_limit: Maximum graph execution steps (default: 25, increased: 100)
+            # Why increase: Complex utility queries need more reasoning steps
+            result = agent.invoke(
+                initial_state,
+                config={"recursion_limit": 100}
+            )
             # agent.invoke(): Execute graph with initial state
+            # config: Configuration with recursion_limit
             # result: Final state
             
             # Display result
@@ -795,36 +801,12 @@ def main() -> None:
 # ==============================================================================
 
 if __name__ == "__main__":
-    """
-    Entry point when script is run directly.
-    
-    if __name__ == "__main__":
-    - Python idiom for script entry point
-    - Why: Separates "run as script" from "import as module"
-    
-    How it works:
-    - When run as script: __name__ == "__main__" (True)
-    - When imported: __name__ == "main" (False)
-    
-    Why important:
-    - Code in this block only runs when script executed directly
-    - Doesn't run when imported by other modules
-    - Allows module to be both library and executable
-    
-    Example:
-    - python main.py → Runs this block
-    - from main import run_agent → Doesn't run this block
-    """
     
     # Call main function
     main()
     # main(): Entry point function defined above
     # All execution logic is in main() and its called functions
     
-    # Why separate main() function:
-    # - Testing: Can test main() without running immediately
-    # - Organization: Clear entry point
-    # - Flexibility: Could call main() from other contexts
 
 
 # ==============================================================================

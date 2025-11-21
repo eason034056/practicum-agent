@@ -25,8 +25,9 @@ from typing import Dict, Any, List
 # Dict, Any, List: Type hints for function signatures
 
 # LangChain imports for LLM and messages
-from langchain_openai import ChatOpenAI
-# ChatOpenAI: OpenAI chat models (GPT-4, GPT-3.5, etc.)
+from langchain_google_genai import ChatGoogleGenerativeAI
+# ChatGoogleGenerativeAI: Google Gemini chat models (Gemini 1.5, 2.0, etc.)
+# Why Gemini: Native grounding support, cost-effective, high quality
 
 from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 # AIMessage: Message from the AI/LLM
@@ -60,24 +61,38 @@ from tools import (
 # ==============================================================================
 # Initialize LLM with Tools
 # ==============================================================================
-# Create the language model instance
-# Why create here: Reused across all agent_node calls
-llm = ChatOpenAI(
-    # model: Which OpenAI model to use
-    model=settings.llm_model,
-    # Example: "gpt-4-turbo-preview"
-    # Why from settings: Easy to change without modifying code
+# Create the language model instance using Google Gemini
+# Why Gemini:
+# - Native grounding with Google Search (already integrated)
+# - Cost-effective compared to GPT-4
+# - High quality reasoning and function calling
+# - Supports all languages
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
     
-    # temperature: Controls randomness (0.0 = deterministic, 2.0 = creative)
+    # temperature: Controls randomness (0.0 = deterministic, 1.0 = creative)
     temperature=settings.llm_temperature,
     # 0.0 for factual tasks (our use case)
     # Higher values for creative tasks
+    # Note: Gemini temperature range is 0.0-1.0 (vs OpenAI's 0.0-2.0)
     
-    # openai_api_key: Authentication
-    openai_api_key=settings.openai_api_key
-    # Why from settings: Secure, not hardcoded
+    # google_api_key: Authentication for Gemini
+    google_api_key=settings.gemini_api_key,
+    # Why use gemini_api_key: Same key for both grounding and agent LLM
+    # This simplifies configuration (one key for everything)
+    
+    # max_tokens: Maximum length of response
+    # max_output_tokens in Gemini API (different naming from OpenAI)
+    max_output_tokens=settings.llm_max_tokens,
+    # Why set this: Prevents runaway token usage
+    
+    # convert_system_message_to_human: Handle system messages
+    # Gemini doesn't have separate system role, converts to human message
+    convert_system_message_to_human=True,
+    # Why True: Ensures system prompts work correctly
 )
-# llm: ChatOpenAI instance ready to generate responses
+# llm: ChatGoogleGenerativeAI instance ready to generate responses
+# This is a drop-in replacement for ChatOpenAI with same interface
 
 # Bind tools to the LLM
 # What is "binding": Teaching LLM about available tools
@@ -212,29 +227,29 @@ def agent_node(state: AgentState) -> Dict[str, Any]:
     # Why build dynamically: Include current gathered information as context
     system_prompt = f"""You are a helpful assistant that identifies utility providers and regulatory information for land development projects.
 
-Your task is to help find:
-1. Authority Having Jurisdiction (AHJ) for the location
-2. Utility providers (gas, electric, water, sewer)
-3. Stormwater management authority
-4. Contact information and connection requirements
+                    Your task is to help find:
+                    1. Authority Having Jurisdiction (AHJ) for the location
+                    2. Utility providers (gas, electric, water, sewer)
+                    3. Stormwater management authority
+                    4. Contact information and connection requirements
 
-Current Progress:
-- AHJ: {state.get('identified_ahj', 'Not yet identified')}
-- Gas Provider: {'Found' if state.get('gas_provider') else 'Not yet found'}
-- Electric Provider: {'Found' if state.get('electric_provider') else 'Not yet found'}
-- Water Provider: {'Found' if state.get('water_provider') else 'Not yet found'}
-- Sewer Provider: {'Found' if state.get('sewer_provider') else 'Not yet found'}
-- Stormwater Authority: {'Found' if state.get('stormwater_authority') else 'Not yet found'}
+                    Current Progress:
+                    - AHJ: {state.get('identified_ahj', 'Not yet identified')}
+                    - Gas Provider: {'Found' if state.get('gas_provider') else 'Not yet found'}
+                    - Electric Provider: {'Found' if state.get('electric_provider') else 'Not yet found'}
+                    - Water Provider: {'Found' if state.get('water_provider') else 'Not yet found'}
+                    - Sewer Provider: {'Found' if state.get('sewer_provider') else 'Not yet found'}
+                    - Stormwater Authority: {'Found' if state.get('stormwater_authority') else 'Not yet found'}
 
-Instructions:
-1. If you don't have the AHJ yet, identify it first using identify_ahj()
-2. Once you have the AHJ, search for each utility type
-3. Use specific search tools for each utility type
-4. Get contact information and requirements when needed
-5. When you have gathered all requested information, provide a comprehensive final answer
+                    Instructions:
+                    1. If you don't have the AHJ yet, identify it first using identify_ahj()
+                    2. Once you have the AHJ, search for each utility type
+                    3. Use specific search tools for each utility type
+                    4. Get contact information and requirements when needed
+                    5. When you have gathered all requested information, provide a comprehensive final answer
 
-Be thorough and ensure all information is grounded in search results.
-"""
+                    Be thorough and ensure all information is grounded in search results.
+                    """
     
     # ============ LOGGING START ============
     print("📊 Current State Overview:")
@@ -269,16 +284,20 @@ Be thorough and ensure all information is grounded in search results.
     # Why this order: System prompt first, then conversation
     
     # Call LLM to get next action
-    # llm_with_tools: Our LLM instance with bound tools
+    # llm_with_tools: Our LLM instance with bound tools (now using Gemini)
     # invoke: Synchronous call to LLM
     # messages: The conversation to analyze
-    print("⏳ Calling LLM (OpenAI GPT)...")
+    print("⏳ Calling LLM (Google Gemini)...")
     response = llm_with_tools.invoke(messages)
     # response: AIMessage object from LLM
     # Contains either:
     # - tool_calls: List of tools to execute
-    # - content: Final answer text
+    # - content: Final answer (string for OpenAI, list for Gemini)
     # Why invoke: Synchronous call (simpler than async for this use case)
+    # 
+    # Note: Gemini returns content as list of dicts: [{'type': 'text', 'text': '...'}]
+    #       OpenAI returns content as string: "..."
+    #       We handle both formats in the code below
     print("✅ LLM response received")
     print()
     
@@ -329,11 +348,30 @@ Be thorough and ensure all information is grounded in search results.
         # LLM provided final answer (no more tools needed)
         # Why: Agent has gathered enough information
         
+        # Extract text content from response
+        # Handle both OpenAI (string) and Gemini (list) formats
+        # Gemini returns content as: [{'type': 'text', 'text': '...'}, ...]
+        # OpenAI returns content as: "..."
+        if isinstance(response.content, list):
+            # Gemini format: list of content items
+            text_parts = []
+            for item in response.content:
+                if isinstance(item, dict) and 'text' in item:
+                    # Extract text from dict
+                    text_parts.append(item['text'])
+                elif isinstance(item, str):
+                    # Already a string
+                    text_parts.append(item)
+            content_text = '\n'.join(text_parts)
+        else:
+            # OpenAI format: already a string
+            content_text = response.content
+        
         # ============ LOGGING START ============
         print("✅ LLM Decision: PROVIDE FINAL ANSWER (has enough information)")
         print()
         print("📝 Final Answer Preview:")
-        preview = response.content[:200] + "..." if len(response.content) > 200 else response.content
+        preview = content_text[:200] + "..." if len(content_text) > 200 else content_text
         print(f"   {preview}")
         print()
         print("➡️  Next Action: End execution and return result to user")
@@ -350,9 +388,9 @@ Be thorough and ensure all information is grounded in search results.
             # Tell router to end execution
             # Why "end": Agent is done
             
-            "output": response.content,
+            "output": content_text,
             # Extract final answer text
-            # response.content: The actual answer string
+            # content_text: Formatted text string (handles both Gemini and OpenAI)
             # This becomes the final output to user
             
             "iterations": new_iterations

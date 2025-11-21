@@ -152,41 +152,53 @@ def search_gas_provider(location: str) -> Dict[str, Any]:
             "provider_type": "gas"
         }
     
-    # Extract results from search
+    # Extract Gemini's synthesized answer (new grounding feature)
+    # answer: The AI-synthesized response with comprehensive information
+    gemini_answer = search_result.get("answer", "")
+    
+    # Extract results (sources) for additional context
     results = search_result.get("results", [])
     # .get("results", []): Safe access with empty list default
     
-    # Check if we got results
-    if not results:
-        # No results found
-        return {
-            "status": "error",
-            "error": f"No gas provider information found for {location}",
-            "location": location,
-            "provider_type": "gas"
-        }
-    
-    # Compile information from all results
-    # Why compile: Multiple sources provide more complete picture
-    all_content = []  # List to store content from each result
-    sources = []      # List to track sources
-    
-    # Process each search result
+    # Collect sources for citation
+    sources = []
     for result in results:
-        # result: One search result dict with title, url, content, score
+        sources.append({
+            "title": result.get("title", ""),
+            "url": result.get("url", "")
+        })
+    
+    # Prepare the information content
+    # Priority: Use Gemini's synthesized answer if available (more comprehensive)
+    # Fallback: Compile from individual results (old behavior)
+    if gemini_answer:
+        # Use Gemini's synthesized answer (preferred)
+        # Why preferred: It's a coherent, comprehensive answer synthesized from all sources
+        all_content = [gemini_answer]
+    else:
+        # Fallback: Compile information from individual results
+        # Why fallback: If Gemini didn't search (answered from knowledge) or grounding failed
+        all_content = []
         
-        content = result.get("content", "")
-        # Get the content (text snippet) from this result
+        if not results:
+            # No results and no answer
+            return {
+                "status": "error",
+                "error": f"No gas provider information found for {location}",
+                "location": location,
+                "provider_type": "gas"
+            }
         
-        if content:  # Only include non-empty content
-            all_content.append(content)
-            # Add to our compilation
+        # Process each search result
+        for result in results:
+            # result: One search result dict with title, url, content, score
             
-            sources.append({
-                "title": result.get("title", ""),
-                "url": result.get("url", "")
-            })
-            # Track source for citation and verification
+            content = result.get("content", "")
+            # Get the content (text snippet) from this result
+            
+            if content:  # Only include non-empty content
+                all_content.append(content)
+                # Add to our compilation
     
     # Return structured response
     return {
@@ -270,29 +282,40 @@ def search_electric_provider(location: str) -> Dict[str, Any]:
             "provider_type": "electric"
         }
     
-    # Extract and process results
+    # Extract Gemini's synthesized answer (new grounding feature)
+    gemini_answer = search_result.get("answer", "")
+    
+    # Extract results (sources) for additional context
     results = search_result.get("results", [])
     
-    if not results:
-        return {
-            "status": "error",
-            "error": f"No electric provider information found for {location}",
-            "location": location,
-            "provider_type": "electric"
-        }
-    
-    # Compile information
-    all_content = []
+    # Collect sources for citation
     sources = []
-    
     for result in results:
-        content = result.get("content", "")
-        if content:
-            all_content.append(content)
-            sources.append({
-                "title": result.get("title", ""),
-                "url": result.get("url", "")
-            })
+        sources.append({
+            "title": result.get("title", ""),
+            "url": result.get("url", "")
+        })
+    
+    # Prepare the information content
+    if gemini_answer:
+        # Use Gemini's synthesized answer (preferred)
+        all_content = [gemini_answer]
+    else:
+        # Fallback: Compile from individual results
+        all_content = []
+        
+        if not results:
+            return {
+                "status": "error",
+                "error": f"No electric provider information found for {location}",
+                "location": location,
+                "provider_type": "electric"
+            }
+        
+        for result in results:
+            content = result.get("content", "")
+            if content:
+                all_content.append(content)
     
     # Return structured response
     return {
@@ -365,29 +388,40 @@ def search_water_provider(location: str) -> Dict[str, Any]:
             "provider_type": "water"
         }
     
-    # Extract and process results
+    # Extract Gemini's synthesized answer (new grounding feature)
+    gemini_answer = search_result.get("answer", "")
+    
+    # Extract results (sources) for additional context
     results = search_result.get("results", [])
     
-    if not results:
-        return {
-            "status": "error",
-            "error": f"No water provider information found for {location}",
-            "location": location,
-            "provider_type": "water"
-        }
-    
-    # Compile information
-    all_content = []
+    # Collect sources for citation
     sources = []
-    
     for result in results:
-        content = result.get("content", "")
-        if content:
-            all_content.append(content)
-            sources.append({
-                "title": result.get("title", ""),
-                "url": result.get("url", "")
-            })
+        sources.append({
+            "title": result.get("title", ""),
+            "url": result.get("url", "")
+        })
+    
+    # Prepare the information content
+    if gemini_answer:
+        # Use Gemini's synthesized answer (preferred)
+        all_content = [gemini_answer]
+    else:
+        # Fallback: Compile from individual results
+        all_content = []
+        
+        if not results:
+            return {
+                "status": "error",
+                "error": f"No water provider information found for {location}",
+                "location": location,
+                "provider_type": "water"
+            }
+        
+        for result in results:
+            content = result.get("content", "")
+            if content:
+                all_content.append(content)
     
     # Return structured response
     return {
@@ -456,29 +490,40 @@ def search_sewer_provider(location: str) -> Dict[str, Any]:
             "provider_type": "sewer"
         }
     
-    # Extract and process results
+    # Extract Gemini's synthesized answer (new grounding feature)
+    gemini_answer = search_result.get("answer", "")
+    
+    # Extract results (sources) for additional context
     results = search_result.get("results", [])
     
-    if not results:
-        return {
-            "status": "error",
-            "error": f"No sewer provider information found for {location}",
-            "location": location,
-            "provider_type": "sewer"
-        }
-    
-    # Compile information
-    all_content = []
+    # Collect sources for citation
     sources = []
-    
     for result in results:
-        content = result.get("content", "")
-        if content:
-            all_content.append(content)
-            sources.append({
-                "title": result.get("title", ""),
-                "url": result.get("url", "")
-            })
+        sources.append({
+            "title": result.get("title", ""),
+            "url": result.get("url", "")
+        })
+    
+    # Prepare the information content
+    if gemini_answer:
+        # Use Gemini's synthesized answer (preferred)
+        all_content = [gemini_answer]
+    else:
+        # Fallback: Compile from individual results
+        all_content = []
+        
+        if not results:
+            return {
+                "status": "error",
+                "error": f"No sewer provider information found for {location}",
+                "location": location,
+                "provider_type": "sewer"
+            }
+        
+        for result in results:
+            content = result.get("content", "")
+            if content:
+                all_content.append(content)
     
     # Return structured response
     return {
@@ -557,29 +602,40 @@ def search_stormwater_authority(location: str) -> Dict[str, Any]:
             "provider_type": "stormwater"
         }
     
-    # Extract and process results
+    # Extract Gemini's synthesized answer (new grounding feature)
+    gemini_answer = search_result.get("answer", "")
+    
+    # Extract results (sources) for additional context
     results = search_result.get("results", [])
     
-    if not results:
-        return {
-            "status": "error",
-            "error": f"No stormwater authority information found for {location}",
-            "location": location,
-            "provider_type": "stormwater"
-        }
-    
-    # Compile information
-    all_content = []
+    # Collect sources for citation
     sources = []
-    
     for result in results:
-        content = result.get("content", "")
-        if content:
-            all_content.append(content)
-            sources.append({
-                "title": result.get("title", ""),
-                "url": result.get("url", "")
-            })
+        sources.append({
+            "title": result.get("title", ""),
+            "url": result.get("url", "")
+        })
+    
+    # Prepare the information content
+    if gemini_answer:
+        # Use Gemini's synthesized answer (preferred)
+        all_content = [gemini_answer]
+    else:
+        # Fallback: Compile from individual results
+        all_content = []
+        
+        if not results:
+            return {
+                "status": "error",
+                "error": f"No stormwater authority information found for {location}",
+                "location": location,
+                "provider_type": "stormwater"
+            }
+        
+        for result in results:
+            content = result.get("content", "")
+            if content:
+                all_content.append(content)
     
     # Return structured response
     return {
@@ -676,29 +732,40 @@ def get_utility_contact_info(
             "utility_type": utility_type
         }
     
-    # Extract results
+    # Extract Gemini's synthesized answer (new grounding feature)
+    gemini_answer = search_result.get("answer", "")
+    
+    # Extract results (sources) for additional context
     results = search_result.get("results", [])
     
-    if not results:
-        return {
-            "status": "error",
-            "error": f"No contact information found for {provider_name}",
-            "provider_name": provider_name,
-            "utility_type": utility_type
-        }
-    
-    # Compile contact information
-    all_content = []
+    # Collect sources for citation
     sources = []
-    
     for result in results:
-        content = result.get("content", "")
-        if content:
-            all_content.append(content)
-            sources.append({
-                "title": result.get("title", ""),
-                "url": result.get("url", "")
-            })
+        sources.append({
+            "title": result.get("title", ""),
+            "url": result.get("url", "")
+        })
+    
+    # Prepare the information content
+    if gemini_answer:
+        # Use Gemini's synthesized answer (preferred)
+        all_content = [gemini_answer]
+    else:
+        # Fallback: Compile from individual results
+        all_content = []
+        
+        if not results:
+            return {
+                "status": "error",
+                "error": f"No contact information found for {provider_name}",
+                "provider_name": provider_name,
+                "utility_type": utility_type
+            }
+        
+        for result in results:
+            content = result.get("content", "")
+            if content:
+                all_content.append(content)
     
     # Return structured response
     return {
@@ -787,28 +854,39 @@ def get_connection_requirements(provider_name: str) -> Dict[str, Any]:
             "provider_name": provider_name
         }
     
-    # Extract results
+    # Extract Gemini's synthesized answer (new grounding feature)
+    gemini_answer = search_result.get("answer", "")
+    
+    # Extract results (sources) for additional context
     results = search_result.get("results", [])
     
-    if not results:
-        return {
-            "status": "error",
-            "error": f"No connection requirements found for {provider_name}",
-            "provider_name": provider_name
-        }
-    
-    # Compile requirements information
-    all_content = []
+    # Collect sources for citation
     sources = []
-    
     for result in results:
-        content = result.get("content", "")
-        if content:
-            all_content.append(content)
-            sources.append({
-                "title": result.get("title", ""),
-                "url": result.get("url", "")
-            })
+        sources.append({
+            "title": result.get("title", ""),
+            "url": result.get("url", "")
+        })
+    
+    # Prepare the information content
+    if gemini_answer:
+        # Use Gemini's synthesized answer (preferred)
+        all_content = [gemini_answer]
+    else:
+        # Fallback: Compile from individual results
+        all_content = []
+        
+        if not results:
+            return {
+                "status": "error",
+                "error": f"No connection requirements found for {provider_name}",
+                "provider_name": provider_name
+            }
+        
+        for result in results:
+            content = result.get("content", "")
+            if content:
+                all_content.append(content)
     
     # Return structured response
     return {

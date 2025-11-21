@@ -124,50 +124,64 @@ def identify_ahj(location: str) -> Dict[str, Any]:
             "ahj_type": None
         }
     
+    # Extract Gemini's synthesized answer (new grounding feature)
+    # answer: The AI-synthesized response with comprehensive AHJ information
+    gemini_answer = search_result.get("answer", "")
+    
     # Extract search results
     # results: List of dictionaries, each containing title, url, content, score
     results = search_result.get("results", [])
     # .get("results", []): Safe access, defaults to empty list if missing
     
-    # Check if we got any results
-    # Why check: No results means we can't identify AHJ
-    if not results:
-        return {
-            "status": "error",
-            "error": "No information found for the specified location",
-            "location": location,
-            "ahj_name": None,
-            "ahj_type": None
-        }
-    
-    # Parse results to identify AHJ
-    # In a production system, we might use NLP or a specialized extraction model
-    # For now, we return structured data for the LLM to interpret
-    # Why let LLM interpret: LLMs are good at extracting entities from text
-    
-    # Collect all content for LLM analysis
-    # Why collect all: LLM can synthesize information from multiple sources
-    all_content = []
-    sources = []  # Track source URLs
-    
-    # Iterate through search results
+    # Collect sources for citation
+    sources = []
     for result in results:
-        # result: A single search result dictionary
+        sources.append({
+            "title": result.get("title", ""),
+            "url": result.get("url", "")
+        })
+    
+    # Prepare the information content for LLM analysis
+    # Priority: Use Gemini's synthesized answer if available (more comprehensive)
+    # Fallback: Compile from individual results (old behavior)
+    if gemini_answer:
+        # Use Gemini's synthesized answer (preferred)
+        # Why preferred: It's a coherent, comprehensive answer synthesized from all sources
+        # This provides better AHJ identification with more context
+        all_content = [gemini_answer]
+    else:
+        # Fallback: Compile information from individual results
+        # Why fallback: If Gemini didn't search (answered from knowledge) or grounding failed
+        all_content = []
+        
+        # Check if we got any results
+        # Why check: No results means we can't identify AHJ
+        if not results:
+            return {
+                "status": "error",
+                "error": "No information found for the specified location",
+                "location": location,
+                "ahj_name": None,
+                "ahj_type": None
+            }
+        
+        # Parse results to identify AHJ
+        # In a production system, we might use NLP or a specialized extraction model
+        # For now, we return structured data for the LLM to interpret
+        # Why let LLM interpret: LLMs are good at extracting entities from text
+        
+        # Iterate through search results
+        for result in results:
+            # result: A single search result dictionary
 
-        # Extract content from this result
-        content = result.get("content", "")
-        # Get the text snippet from the webpage
+            # Extract content from this result
+            content = result.get("content", "")
+            # Get the text snippet from the webpage
 
-        # Only include non-empty content
-        if content:
-            all_content.append(content)
-            # Add content to our collection
-
-            sources.append({
-                "title": result.get("title", ""),
-                "url": result.get("url", "")
-            })
-            # Track source for citation purposes
+            # Only include non-empty content
+            if content:
+                all_content.append(content)
+                # Add content to our collection
 
     # Try to extract AHJ name from the search results
     # This allows state to track AHJ identification status
@@ -408,21 +422,38 @@ def get_development_regulations(ahj_name: str) -> Dict[str, Any]:
         
         # Check if search succeeded
         if search_result["status"] == "success":
-            # Extract results from this search
-            results = search_result.get("results", [])
+            # Extract Gemini's synthesized answer (preferred)
+            gemini_answer = search_result.get("answer", "")
             
-            # Process each result
-            for result in results:
-                content = result.get("content", "")
+            if gemini_answer:
+                # Use Gemini's synthesized answer (preferred)
+                # Why preferred: Comprehensive, coherent answer from Gemini
+                all_information.append(f"[From query: {query}]\n{gemini_answer}")
                 
-                if content:  # Only include non-empty content
-                    # Add content with a header showing which query it came from
-                    # Why header: Helps LLM understand context of each piece
-                    all_information.append(f"[From query: {query}]\n{content}")
-                    
-                    # Track the source
+                # Track all sources for this answer
+                results = search_result.get("results", [])
+                for result in results:
                     all_sources.append({
                         "query": query,  # Which query found this
+                        "title": result.get("title", ""),
+                        "url": result.get("url", "")
+                    })
+            else:
+                # Fallback: Extract individual results
+                results = search_result.get("results", [])
+                
+                # Process each result
+                for result in results:
+                    content = result.get("content", "")
+                    
+                    if content:  # Only include non-empty content
+                        # Add content with a header showing which query it came from
+                        # Why header: Helps LLM understand context of each piece
+                        all_information.append(f"[From query: {query}]\n{content}")
+                        
+                        # Track the source
+                        all_sources.append({
+                            "query": query,  # Which query found this
                         "title": result.get("title", ""),
                         "url": result.get("url", "")
                     })

@@ -117,6 +117,14 @@ class Settings(BaseSettings):
     # Required for Google Custom Search API authentication
     # Get from: https://programmablesearchengine.google.com/
     
+    gemini_api_key: str = Field(
+        default="",
+        description="Google Gemini API key for Grounding with Google Search"
+    )
+    # Why Gemini: Native Google Search grounding with automatic citations
+    # Provides real-time web search integrated with Gemini models
+    # Get from: https://aistudio.google.com/app/apikey
+    
     # --------------------------------------------------------------------------
     # LangSmith Configuration (Monitoring)
     # --------------------------------------------------------------------------
@@ -146,12 +154,14 @@ class Settings(BaseSettings):
     # Agent Configuration
     # --------------------------------------------------------------------------
     max_iterations: int = Field(
-        default=15,
+        default=50,
         description="Maximum reasoning iterations before stopping"
     )
     # Why needed: Prevents infinite loops if agent gets confused
-    # Why 15: Typical utility search takes 5-10 iterations
-    # (1. Identify AHJ, 2-6. Search each utility type, 7-10. Get details)
+    # Why 50: Comprehensive utility search with Gemini grounding takes 20-40 iterations
+    # (1-5. Identify AHJ, 6-15. Search each utility type with grounding, 
+    #  16-30. Get detailed contact info and requirements, 31-40. Compile report)
+    # Increased from 15 to support more thorough searches with Gemini
     
     enable_human_in_loop: bool = Field(
         default=False,

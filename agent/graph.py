@@ -319,11 +319,22 @@ def run_agent(user_input: str) -> Dict[str, Any]:
     # Run the graph with initial state
     # invoke: Synchronous execution method
     # initial_state: Starting state
+    # config: Configuration including recursion_limit
     print("▶️  Invoking agent graph...")
     print("   Graph will now execute until completion (agent decides to stop)")
+    print("   Recursion limit: 100 steps (increased from default 25)")
     print()
     
-    final_state = agent_graph.invoke(initial_state)
+    # Invoke with increased recursion limit
+    # recursion_limit: Maximum number of graph execution steps
+    # Default: 25 steps
+    # Increased: 100 steps for complex queries with multiple utility searches
+    # Why 100: Each utility search is ~2-3 steps, need 5 utilities = 15+ steps
+    #          Plus AHJ identification, contact info, requirements = 50+ steps total
+    final_state = agent_graph.invoke(
+        initial_state,
+        config={"recursion_limit": 100}
+    )
     # final_state: State after graph execution completes
     # Contains:
     # - output: Final answer

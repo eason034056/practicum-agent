@@ -10,6 +10,10 @@ langgraph>=0.0.20
 # Provides chat models, embeddings, and function calling capabilities
 langchain-openai>=0.0.5
 
+# langchain-google-genai: Official integration for Google Gemini models
+# Provides chat models with grounding, function calling, and multimodal capabilities
+langchain-google-genai>=1.0.0
+
 # langchain-community: Community-contributed integrations and tools
 # Includes additional utilities and third-party service integrations
 langchain-community>=0.0.10
@@ -32,6 +36,11 @@ google-cloud-trace>=1.11.0
 # Provides search functionality that grounds responses in real search results
 # Enables combining generative AI with Google Search quality
 google-cloud-discoveryengine>=0.11.0
+
+# google-genai: Official Google Generative AI SDK for Gemini
+# Provides native support for Grounding with Google Search
+# Enables real-time web search with automatic citations
+google-genai>=0.1.0
 
 # Utilities
 # python-dotenv: Load environment variables from .env file
